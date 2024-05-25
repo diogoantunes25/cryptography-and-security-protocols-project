@@ -13,9 +13,8 @@ def configure(k):
     Configure system by setting public parameters
     k = bit length of prime
     """
-    get_prime(k)
-    p = 151
-    eta.init(p)
+    eta.init(k)
+    p = ecc._order
     config = {"k": k, "p": p, "g": ecc.gen() }
     print(f"k = {config['k']}")
     print(f"p = {config['p']}")
@@ -74,7 +73,7 @@ def prove(sk, x, config):
 
     return f, pi
 
-def ver(x, y, pi, pk):
+def ver(x, y, pi, pk, config):
     """
     x \in Zp*
     y \in Zp*
@@ -104,10 +103,15 @@ def ver(x, y, pi, pk):
     _, x2, y2 = pi
     return eta.pairing(x1, y1, x2, y2) == y
 
-x = 10
-config = configure(8)
-keys = gen(config) 
-f, pi = prove(keys['sk'], 10, config)
+def test():
+    x = 10
+    k = 151
+    config = configure(k)
+    keys = gen(config) 
+    f, pi = prove(keys['sk'], 10, config)
+    f2, _ = prove(keys['sk'], 11, config)
 
-y = f
-print(ver(x, y, pi, keys['pk']))
+    ver(x, f, pi, keys['pk'], config)
+    ver(x, f2, pi, keys['pk'], config)
+
+test()
