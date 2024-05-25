@@ -2,116 +2,131 @@ from Crypto.Random import random
 from Crypto.Util.number import inverse
 from tate_bilinear_pairing import eta, ecc
 
-def get_prime(k):
+class VRFPK:
     """
-    Get prime with provided bit length
+    VRF public key
     """
-    pass
 
-def configure(k):
-    """
-    Configure system by setting public parameters
-    k = bit length of prime
-    """
-    eta.init(k)
-    p = ecc._order
-    config = {"k": k, "p": p, "g": ecc.gen() }
-    print(f"k = {config['k']}")
-    print(f"p = {config['p']}")
-    print(f"g = {config['g']}")
+    def __init__(self, k: int = None, p: int = None, g = None, gs = None):
+        self.k = k
+        self.p = p
+        self.g = g
+        self.gs = gs
 
-    return config
+class VRF:
+    def __init__(self, k: int = None, pk: VRFPK = None):
+        if pk is None: self._init_prover(k)
+        else: self._init_verifier(pk)
 
-def gen(config):
-    # pick random s in Zp*
-    p = config['p']
-    g = config['g']
-    s = random.randint(1, p-1)
-    print(f"s = {s}")
-    gs = ecc.scalar_mult(s, g)
-    print(f"gs = {gs}")
+    def _init_prover(self, k: int):
+        eta.init(k)
 
-    return {"sk": s, "pk": gs }
+        g = ecc.gen()
+        p = ecc._order
+        self.sk = random.randint(1, p-1)
+        self.pk = VRFPK(k, p, g, ecc.scalar_mult(self.sk, g))
 
-def prove(sk, x, config):
-    """
-    x \in Zp*
-    """
-    p = config['p']
-    g = config['g']
-    _, xg, yg = g
-    egg = eta.pairing(xg, yg, xg, yg)
+        print(f"k = {self.pk.k}")
+        print(f"p = {self.pk.p}")
+        print(f"g = {self.pk.g}")
+        print(f"gs= {self.pk.gs}")
+        print(f"s (sk) = {self.sk}")
 
-    a = (x+sk) % p
-    ainv = inverse(a, p)
+    def _init_verifier(self, pk: VRFPK):
+        self.pk = pk
 
-    print(f"e(g,g) = {egg}")
-    print(f"x+sk = {a}")
-    print(f"1/(x+sk) = {ainv}")
-    print(f"(x+sk)*(1/(x+sk)) = {(ainv * a) % p}")
+    def get_public_key(self):
+        return self.pk
 
-    assert((ainv * a) % p == 1)
+    def prove(self, x: int):
+        """
+        x \in Zp*
+        """
+        _, xg, yg = self.pk.g
+        egg = eta.pairing(xg, yg, xg, yg)
 
-    # compute g^(1/(x+sk))
-    pi = ecc.scalar_mult(ainv, g)
-    print(f"pi = {pi}")
+        a = (x+self.sk) % self.pk.p
+        ainv = inverse(a, self.pk.p)
 
-    # sanity check - e(g^(x+sk), g^(1/x+sk)) = e(g,g)
-    notpi = ecc.scalar_mult(a, g)
-    print(f"notpi = {notpi}")
+        print(f"e(g,g) = {egg}")
+        print(f"x+sk = {a}")
+        print(f"1/(x+sk) = {ainv}")
+        print(f"(x+sk)*(1/(x+sk)) = {(ainv * a) % self.pk.p}")
 
-    _, xpi, ypi = pi
-    _, xnotpi, ynotpi = notpi
-    should_be_egg = eta.pairing(xpi, ypi, xnotpi, ynotpi)
-    print(f"e(pi, notpi) = {should_be_egg}")
+        assert((ainv * a) % self.pk.p == 1)
 
-    # compute e(g,g)^(1/(x+sk))
-    # by computing e(g, pi)
-    _, xpi, ypi = pi
-    f = eta.pairing(xg, yg, xpi, ypi)
-    print(f"f = {f}")
+        # compute g^(1/(x+sk))
+        pi = ecc.scalar_mult(ainv, self.pk.g)
+        print(f"pi = {pi}")
 
-    return f, pi
+        # sanity check - e(g^(x+sk), g^(1/x+sk)) = e(g,g)
+        notpi = ecc.scalar_mult(a, self.pk.g)
+        print(f"notpi = {notpi}")
 
-def ver(x, y, pi, pk, config):
-    """
-    x \in Zp*
-    y \in Zp*
-    """
-    g = config['g']
+        _, xpi, ypi = pi
+        _, xnotpi, ynotpi = notpi
+        should_be_egg = eta.pairing(xpi, ypi, xnotpi, ynotpi)
+        print(f"e(pi, notpi) = {should_be_egg}")
 
-    # compute e(g^x * PK, pi)
-    gx = ecc.scalar_mult(x, g)
-    gxtimespk = ecc.add(gx, pk)
-    print(f"g^x * PK = {gxtimespk}")
-    _, x1, y1 = gxtimespk
-    _, x2, y2 = pi
-    left = eta.pairing(x1, y1, x2, y2)
-    print(f"e(g^x * PK, pi) = {left}")
+        # compute e(g,g)^(1/(x+sk))
+        # by computing e(g, pi)
+        _, xpi, ypi = pi
+        f = eta.pairing(xg, yg, xpi, ypi)
+        print(f"f = {f}")
 
-    # compute e(g,g)
-    _, xg, yg = g
-    right = eta.pairing(xg, yg, xg, yg)
-    print(f"e(g,g) = {right}")
+        return f, pi
 
-    if left != right:
-        print("e(g^x * PK, pi) != e(g,g)")
-        return False
+    def ver(self, x, y, pi):
+        """
+        x \in Zp*
+        y \in Zp*
+        """
 
-    # check e(g, pi) = y
-    _, x1, y1 = g
-    _, x2, y2 = pi
-    return eta.pairing(x1, y1, x2, y2) == y
+        # compute e(g^x * PK, pi)
+        gx = ecc.scalar_mult(x, self.pk.g)
+        gxtimespk = ecc.add(gx, self.pk.gs)
+        print(f"g^x * PK = {gxtimespk}")
+        _, x1, y1 = gxtimespk
+        _, x2, y2 = pi
+        left = eta.pairing(x1, y1, x2, y2)
+        print(f"e(g^x * PK, pi) = {left}")
+
+        # compute e(g,g)
+        _, xg, yg = self.pk.g
+        right = eta.pairing(xg, yg, xg, yg)
+        print(f"e(g,g) = {right}")
+
+        if left != right:
+            print("e(g^x * PK, pi) != e(g,g)")
+            return False
+
+        # check e(g, pi) = y
+        _, x1, y1 = self.pk.g
+        _, x2, y2 = pi
+        return eta.pairing(x1, y1, x2, y2) == y
 
 def test():
-    x = 10
     k = 151
-    config = configure(k)
-    keys = gen(config) 
-    f, pi = prove(keys['sk'], 10, config)
-    f2, _ = prove(keys['sk'], 11, config)
+    prover = VRF(k = k)
+    verifier = VRF(pk = prover.get_public_key())
 
-    ver(x, f, pi, keys['pk'], config)
-    ver(x, f2, pi, keys['pk'], config)
+    f10, pi10 = prover.prove(10)
+    f100, pi100 = prover.prove(100)
+
+    # Good case
+    if verifier.ver(10, f10, pi10): print("It's legit")
+    else: print("Bad stuff")
+
+    # Bad bits
+    if verifier.ver(100, f10, pi100): print("It's legit")
+    else: print("Bad stuff")
+
+    # Bad proof
+    if verifier.ver(100, f100, pi10): print("It's legit")
+    else: print("Bad stuff")
+
+    # Bad proof and bad bits
+    if verifier.ver(100, f10, pi10): print("It's legit")
+    else: print("Bad stuff")
 
 test()
