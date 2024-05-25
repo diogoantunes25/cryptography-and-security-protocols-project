@@ -11,7 +11,7 @@
   in
   {
     devShell.x86_64-linux = pkgs.mkShell {
-      buildInputs = with pkgs; [ rustc cargo gcc rustfmt clippy ];
+      buildInputs = with pkgs; [ rustc cargo gcc rustfmt clippy openssl libffi ];
     };
   };
 }
