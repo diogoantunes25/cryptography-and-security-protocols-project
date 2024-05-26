@@ -146,37 +146,4 @@ class VRFHashed:
         _, x2, y2 = pi
         return eta.pairing(x1, y1, x2, y2) == y
 
-def test(k, reps):
-    prover = VRFHashed(k = k)
-    verifier = VRFHashed(pk = prover.get_public_key())
 
-    def test_single():
-        a = random.randint(1, 1000)
-        b = random.randint(1, 1000)
-        while b == a:
-            b = random.randint(1, 1000)
-
-        print(f"running test with a = {a} and b = {b}")
-
-        fa, pia = prover.prove(a)
-        fb, pib = prover.prove(b)
-
-        return verifier.ver(a, fa, pia) and \
-                verifier.ver(b, fb, pib) and \
-                not verifier.ver(a, fa, pib) and \
-                not verifier.ver(a, fb, pia) and \
-                not verifier.ver(a, fb, pib) and \
-                not verifier.ver(b, fb, pia) and \
-                not verifier.ver(b, fa, pib) and \
-                not verifier.ver(b, fa, pia)
-
-    
-    for _ in range(reps):
-        if not test_single(): return False
-
-    return True
-
-reps = 1
-assert(test(160, reps))
-
-print("All tests passed")

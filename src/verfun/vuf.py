@@ -83,20 +83,4 @@ class VUF:
 
         return left == right
 
-def test():
-    k = 151
-    prover = VUF(k = k)
-    verifier = VUF(pk = prover.get_public_key())
 
-    sig10 = prover.sign(10)
-    sig100 = prover.sign(100)
-
-    # Good case
-    if verifier.ver(10, sig10): print("It's legit")
-    else: print("Bad stuff")
-
-    # Bad sig
-    if verifier.ver(10, sig100): print("It's legit")
-    else: print("Bad stuff")
-
-test()

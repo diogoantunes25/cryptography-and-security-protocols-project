@@ -48,6 +48,7 @@ class VRF:
 
         a = (x+self.sk) % self.pk.p
         print(f"inverting {a} mod {self.pk.p}")
+
         # If a is 0, it can't be inverted
         # raising an exception does reveal the secret, but the probability
         # of an adversary picking x s.t. x+self.sk = 0 mod p is the same as
@@ -111,39 +112,3 @@ class VRF:
         _, x1, y1 = self.pk.g
         _, x2, y2 = pi
         return eta.pairing(x1, y1, x2, y2) == y
-
-def test(k, reps):
-    prover = VRF(k = k)
-    verifier = VRF(pk = prover.get_public_key())
-
-    def test_single():
-        a = random.randint(1, 1000)
-        b = random.randint(1, 1000)
-        while b == a:
-            b = random.randint(1, 1000)
-
-        print(f"running test with a = {a} and b = {b}")
-
-        fa, pia = prover.prove(a)
-        fb, pib = prover.prove(b)
-
-        return verifier.ver(a, fa, pia) and \
-                verifier.ver(b, fb, pib) and \
-                not verifier.ver(a, fa, pib) and \
-                not verifier.ver(a, fb, pia) and \
-                not verifier.ver(a, fb, pib) and \
-                not verifier.ver(b, fb, pia) and \
-                not verifier.ver(b, fa, pib) and \
-                not verifier.ver(b, fa, pia)
-
-    
-    for _ in range(reps):
-        if not test_single(): return False
-
-    return True
-
-reps = 5
-for k in [10, 30, 79, 100, 151, 160]:
-    assert(test(k, reps))
-
-print("All tests passed")
