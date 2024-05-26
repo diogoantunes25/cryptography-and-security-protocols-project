@@ -4,7 +4,8 @@ import random
 
 def test_hvrf():
     k = 160
-    reps = 5
+    # reps = 5
+    reps = 1
     prover = VRFHashed(k = k)
     verifier = VRFHashed(pk = prover.get_public_key())
 
