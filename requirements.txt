@@ -1,4 +1,5 @@
 pycryptodome
-pycrypto
+pycryptodomex
+pycryptodome-test-vectors
 petlib
 tate_bilinear_pairing

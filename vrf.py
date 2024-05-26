@@ -42,10 +42,19 @@ class VRF:
         """
         x \in Zp*
         """
+        x = x % self.pk.p 
         _, xg, yg = self.pk.g
         egg = eta.pairing(xg, yg, xg, yg)
 
         a = (x+self.sk) % self.pk.p
+        print(f"inverting {a} mod {self.pk.p}")
+        # If a is 0, it can't be inverted
+        # raising an exception does reveal the secret, but the probability
+        # of an adversary picking x s.t. x+self.sk = 0 mod p is the same as
+        # the probability of finding the secret key
+        if a == 0:
+            raise Exception("can't compute the proof")
+
         ainv = inverse(a, self.pk.p)
 
         print(f"e(g,g) = {egg}")
@@ -78,8 +87,6 @@ class VRF:
 
     def ver(self, x, y, pi):
         """
-        x \in Zp*
-        y \in Zp*
         """
 
         # compute e(g^x * PK, pi)
@@ -105,28 +112,38 @@ class VRF:
         _, x2, y2 = pi
         return eta.pairing(x1, y1, x2, y2) == y
 
-def test():
-    k = 151
+def test(k, reps):
     prover = VRF(k = k)
     verifier = VRF(pk = prover.get_public_key())
 
-    f10, pi10 = prover.prove(10)
-    f100, pi100 = prover.prove(100)
+    def test_single():
+        a = random.randint(1, 1000)
+        b = random.randint(1, 1000)
+        while b == a:
+            b = random.randint(1, 1000)
 
-    # Good case
-    if verifier.ver(10, f10, pi10): print("It's legit")
-    else: print("Bad stuff")
+        print(f"running test with a = {a} and b = {b}")
 
-    # Bad bits
-    if verifier.ver(100, f10, pi100): print("It's legit")
-    else: print("Bad stuff")
+        fa, pia = prover.prove(a)
+        fb, pib = prover.prove(b)
 
-    # Bad proof
-    if verifier.ver(100, f100, pi10): print("It's legit")
-    else: print("Bad stuff")
+        return verifier.ver(a, fa, pia) and \
+                verifier.ver(b, fb, pib) and \
+                not verifier.ver(a, fa, pib) and \
+                not verifier.ver(a, fb, pia) and \
+                not verifier.ver(a, fb, pib) and \
+                not verifier.ver(b, fb, pia) and \
+                not verifier.ver(b, fa, pib) and \
+                not verifier.ver(b, fa, pia)
 
-    # Bad proof and bad bits
-    if verifier.ver(100, f10, pi10): print("It's legit")
-    else: print("Bad stuff")
+    
+    for _ in range(reps):
+        if not test_single(): return False
 
-test()
+    return True
+
+reps = 5
+for k in [10, 30, 79, 100, 151, 160]:
+    assert(test(k, reps))
+
+print("All tests passed")
