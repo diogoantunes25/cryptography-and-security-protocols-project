@@ -1,10 +1,13 @@
 from Crypto.Random import random
 from Crypto.Util.number import inverse
 from tate_bilinear_pairing import eta, ecc
+import pickle
 
 class VRFPK:
     """
-    VRF public key
+    VRF public parameters
+    Includes g^s (what the paper refers to as the public key) and other public
+    parameters.
     """
 
     def __init__(self, k: int = None, p: int = None, g = None, gs = None):
@@ -14,9 +17,14 @@ class VRFPK:
         self.gs = gs
 
 class VRF:
-    def __init__(self, k: int = None, pk: VRFPK = None):
+    def __init__(self, k: int = None, pk: VRFPK = None, init_eta: bool = False):
+        """
+        Initialize verifiable random function.
+        The prover should initialize it with some security parameter k.
+        The verifier should initialize it with the public key provided by the prover.
+        """
         if pk is None: self._init_prover(k)
-        else: self._init_verifier(pk)
+        else: self._init_verifier(pk, init_eta)
 
     def _init_prover(self, k: int):
         eta.init(k)
@@ -32,15 +40,21 @@ class VRF:
         print(f"gs= {self.pk.gs}")
         print(f"s (sk) = {self.sk}")
 
-    def _init_verifier(self, pk: VRFPK):
+    def _init_verifier(self, pk: VRFPK, init_eta: bool):
         self.pk = pk
+        if init_eta: eta.init(self.pk.k)
+
+        print(f"k = {self.pk.k}")
+        print(f"p = {self.pk.p}")
+        print(f"g = {self.pk.g}")
+        print(f"gs= {self.pk.gs}")
 
     def get_public_key(self):
         return self.pk
 
     def prove(self, x: int):
         """
-        x \in Zp*
+        Generate random group element and proof of correctness for generation.
         """
         x = x % self.pk.p 
         _, xg, yg = self.pk.g
@@ -69,15 +83,6 @@ class VRF:
         pi = ecc.scalar_mult(ainv, self.pk.g)
         print(f"pi = {pi}")
 
-        # sanity check - e(g^(x+sk), g^(1/x+sk)) = e(g,g)
-        notpi = ecc.scalar_mult(a, self.pk.g)
-        print(f"notpi = {notpi}")
-
-        _, xpi, ypi = pi
-        _, xnotpi, ynotpi = notpi
-        should_be_egg = eta.pairing(xpi, ypi, xnotpi, ynotpi)
-        print(f"e(pi, notpi) = {should_be_egg}")
-
         # compute e(g,g)^(1/(x+sk))
         # by computing e(g, pi)
         _, xpi, ypi = pi
@@ -88,6 +93,8 @@ class VRF:
 
     def ver(self, x, y, pi):
         """
+        Verify that the random group elemenent y was generated from x using 
+        proof pi.
         """
 
         # compute e(g^x * PK, pi)
@@ -112,3 +119,64 @@ class VRF:
         _, x1, y1 = self.pk.g
         _, x2, y2 = pi
         return eta.pairing(x1, y1, x2, y2) == y
+
+def prover():
+    k = int(input("Insert security parameter: "))
+    vrf = VRF(k = k)
+    pk_file = input("Insert file to store the public parameters to: ")
+
+    with open(pk_file, 'wb') as fh:
+        pickle.dump(vrf.get_public_key(), fh)
+
+    print(f"Public parameters saved to {pk_file}")
+
+    again = "y"
+    while again == "y":
+        x = int(input("Insert x: "))
+        proof_file = input("Insert file where random element and proof should be stored: ")
+        with open(proof_file, 'wb') as fh:
+            obj = vrf.prove(x)
+            pickle.dump(obj, fh)
+
+        again = ""
+        while again not in ["y", "n"]:
+            again = input("Do you want to do it again? [y/n] ")
+
+def verifier():
+    pk_file = input("Insert file where public parameters were stored: ")
+    with open(pk_file, 'rb') as fh:
+        pk = pickle.load(fh)
+
+    vrf = VRF(pk = pk, init_eta = True)
+
+    print(f"Public parameters loaded from {pk_file}")
+
+    again = "y"
+    while again == "y":
+        x = int(input("Insert x: "))
+        proof_file = input("Insert file where random element and proof were stored: ")
+        with open(proof_file, 'rb') as fh:
+            f, pi = pickle.load(fh)
+            print(f"f = {f}")
+            print(f"pi = {pi}")
+
+        print(f"ver({x}, {f}, {pi}) = {vrf.ver(x, f, pi)}")
+        if vrf.ver(x, f, pi):
+            print("Proof looks good")
+        else:
+            print("Invalid proof")
+
+        again = ""
+        while again not in ["y", "n"]:
+            again = input("Do you want to do it again? [y/n] ")
+
+def main():
+    user_type = ""
+    while user_type not in ["p", "v"]:
+        user_type = input("Are you a prover or a verifier? [p/v] ") 
+
+    if user_type == "p": prover()
+    else: verifier()
+
+if __name__ == "__main__":
+    main()

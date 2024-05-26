@@ -4,7 +4,9 @@ from tate_bilinear_pairing import eta, ecc
 
 class VUFPK:
     """
-    VUF public key
+    VUF public parameters
+    Includes g^s (what the paper refers to as the public key) and other public
+    parameters.
     """
 
     def __init__(self, k: int = None, p: int = None, g = None, gs = None):
@@ -15,6 +17,11 @@ class VUFPK:
 
 class VUF:
     def __init__(self, k: int = None, pk: VUFPK = None):
+        """
+        Initialize verifiable unpredictable function.
+        The prover should initialize it with some security parameter k.
+        The verifier should initialize it with the public key provided by the prover.
+        """
         if pk is None: self._init_prover(k)
         else: self._init_verifier(pk)
 
@@ -40,7 +47,7 @@ class VUF:
 
     def sign(self, x: int):
         """
-        x \in Zp*
+        Generate group element (i.e. a signature of x).
         """
         _, xg, yg = self.pk.g
         egg = eta.pairing(xg, yg, xg, yg)
@@ -63,8 +70,7 @@ class VUF:
 
     def ver(self, x, y):
         """
-        x \in Zp*
-        y \in Zp*
+        Verifies that y is a signature of x.
         """
 
         # compute e(g^x * PK, sig)
@@ -82,5 +88,3 @@ class VUF:
         print(f"e(g,g) = {right}")
 
         return left == right
-
-

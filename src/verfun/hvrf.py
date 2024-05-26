@@ -6,7 +6,9 @@ import math
 
 class VRFPK:
     """
-    VRF public key
+    VRF public parameters
+    Includes g^s (what the paper refers to as the public key) and other public
+    parameters.
     """
 
     def __init__(self, k: int = None, p: int = None, g = None, gs = None):
@@ -18,6 +20,11 @@ class VRFPK:
 class VRFHashed:
 
     def __init__(self, k: int = None, pk: VRFPK = None):
+        """
+        Initialize verifiable random function.
+        The prover should initialize it with some security parameter k.
+        The verifier should initialize it with the public key provided by the prover.
+        """
         if pk is None: self._init_prover(k)
         else: self._init_verifier(pk)
 
@@ -72,7 +79,7 @@ class VRFHashed:
 
     def prove(self, m: int):
         """
-        m any
+        Generate random group element and proof of correctness for generation.
         """
         x = self.hash(m)
 
@@ -101,15 +108,6 @@ class VRFHashed:
         pi = ecc.scalar_mult(ainv, self.pk.g)
         print(f"pi = {pi}")
 
-        # sanity check - e(g^(x+sk), g^(1/x+sk)) = e(g,g)
-        notpi = ecc.scalar_mult(a, self.pk.g)
-        print(f"notpi = {notpi}")
-
-        _, xpi, ypi = pi
-        _, xnotpi, ynotpi = notpi
-        should_be_egg = eta.pairing(xpi, ypi, xnotpi, ynotpi)
-        print(f"e(pi, notpi) = {should_be_egg}")
-
         # compute e(g,g)^(1/(x+sk))
         # by computing e(g, pi)
         _, xpi, ypi = pi
@@ -120,6 +118,8 @@ class VRFHashed:
 
     def ver(self, m, y, pi):
         """
+        Verify that the random group elemenent y was generated from x using 
+        proof pi.
         """
         x = self.hash(m)
 
